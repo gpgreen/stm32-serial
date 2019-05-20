@@ -3,20 +3,16 @@
 
 // pick a panicking behavior
 extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-// extern crate panic_abort; // requires nightly
-// extern crate panic_itm; // logs messages over ITM; requires ITM support
-// extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
-
-use nb::block;
-
-use nucleo_f103rb::hal::{
-    prelude::*,
-    stm32,
-    timer::Timer,
-};
-use nucleo_f103rb::serial::Serial;
+                         // extern crate panic_abort; // requires nightly
+                         // extern crate panic_itm; // logs messages over ITM; requires ITM support
+                         // extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
 
 use cortex_m_rt::entry;
+use nb::block;
+use nucleo_f103rb::hal::{prelude::*, stm32, timer::Timer};
+use nucleo_f103rb::serial::Serial;
+mod serial;
+use serial_packet_parser::PacketParser;
 
 #[entry]
 fn main() -> ! {
@@ -55,7 +51,7 @@ fn main() -> ! {
 
     // separate into tx and rx channels
     let (mut tx, mut rx) = serial.split();
-    
+
     // Write 'R' to the USART
     block!(tx.write(b'R')).ok();
 
@@ -66,13 +62,24 @@ fn main() -> ! {
     // Configure the syst timer to trigger an update every second
     let mut timer = Timer::syst(cp.SYST, 1.hz(), clocks);
 
+    // create serial types
+    let mut parser = PacketParser::new();
+    let mut serial_handler = serial::SerialHandler::new();
+
     // Wait for the timer to trigger an update and change the state of the LED
     loop {
         block!(timer.wait()).unwrap();
         led.set_high();
         block!(timer.wait()).unwrap();
         led.set_low();
-        // Receive a byte from the USART and store it in "received"
-        // let received = block!(rx.read()).unwrap();
+        // if there is a byte ready, fetch from the USART and store it in "received"
+        match rx.read() {
+            Ok(_) => {
+                let received = block!(rx.read()).unwrap();
+                parser = serial_handler.receive_byte(received, parser);
+            }
+            Err(nb::Error::WouldBlock) => {}
+            _ => {}
+        }
     }
 }
