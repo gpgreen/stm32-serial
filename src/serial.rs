@@ -1,39 +1,9 @@
 use serial_packet_parser::{PacketParser, USARTPacket};
+use crate::register::{usartpacket_type, USARTPacketType};
 
 const BAD_CHECKSUM: u8 = 253;
 const UNKNOWN_ADDRESS: u8 = 254;
 const INVALID_BATCH_SIZE: u8 = 255;
-
-// constants for address range sizes
-const CONFIG_ARRAY_SIZE: u8 = 64;
-const DATA_ARRAY_SIZE: u8 = 60;
-const COMMAND_COUNT: u8 = 12;
-
-// constants for address starts
-const DATA_ARRAY_START: u8 = 80;
-const COMMAND_ADDR_START: u8 = 160;
-
-//assert! (CONFIG_ARRAY_SIZE < DATA_ARRAY_START);
-
-pub enum USARTPacketType {
-    Config,
-    Data,
-    Command,
-    Unknown,
-}
-
-pub fn usartpacket_type(pkt: &USARTPacket) -> USARTPacketType {
-    if pkt.address < CONFIG_ARRAY_SIZE {
-        USARTPacketType::Config
-    } else if pkt.address >= DATA_ARRAY_START && pkt.address < DATA_ARRAY_START + DATA_ARRAY_SIZE {
-        USARTPacketType::Data
-    } else if pkt.address >= COMMAND_ADDR_START && pkt.address < COMMAND_ADDR_START + COMMAND_COUNT
-    {
-        USARTPacketType::Command
-    } else {
-        USARTPacketType::Unknown
-    }
-}
 
 pub struct SerialHandler {
     pkt_buf: USARTPacket,

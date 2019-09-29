@@ -13,6 +13,8 @@ use nucleo_f103rb::hal::{prelude::*, stm32, timer::Timer};
 use nucleo_f103rb::serial::Serial;
 mod serial;
 use serial_packet_parser::PacketParser;
+mod register;
+use register::Registers;
 
 #[entry]
 fn main() -> ! {
@@ -30,6 +32,9 @@ fn main() -> ! {
     // the frozen frequencies in `clocks`
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
+    // create registers
+    let mut registers = Registers::new();
+    
     // afio
     let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
 
