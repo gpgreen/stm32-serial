@@ -34,6 +34,7 @@ fn main() -> ! {
 
     // create registers
     let mut registers = Registers::new();
+    registers.get_configuration();
     
     // afio
     let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
