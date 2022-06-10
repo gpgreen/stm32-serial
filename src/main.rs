@@ -28,14 +28,14 @@ fn main() -> ! {
     let mut flash = dp.FLASH.constrain();
     let mut rcc = dp.RCC.constrain();
 
-    // Freeze the configuration of all the clocks in the system and store
+    // Freeze the configuration of acll the clocks in the system and store
     // the frozen frequencies in `clocks`
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
     // create registers
     let mut registers = Registers::new();
     registers.get_configuration();
-    
+
     // afio
     let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
 
