@@ -1,4 +1,5 @@
 use serial_packet_parser::USARTPacket;
+use stm32f1xx_hal::pac;
 
 // constants for address range sizes
 const CONFIG_ARRAY_SIZE: u8 = 64;
@@ -39,7 +40,7 @@ pub fn usartpacket_type(pkt: &USARTPacket) -> USARTPacketType {
 
 pub struct Registers {
     registers: [u32; REGISTER_ARRAY_SIZE],
-    peripheral: nucleo_f103rb::hal::stm32::Peripherals,
+    peripheral: pac::Peripherals,
 }
 
 pub enum UseFlashStartAddress {
@@ -57,33 +58,38 @@ impl Registers {
          */
         Registers {
             registers: [0; REGISTER_ARRAY_SIZE],
-            peripheral: nucleo_f103rb::hal::stm32::Peripherals::take().unwrap(),
+            peripheral: pac::Peripherals::take().unwrap(),
         }
     }
 
-    fn flash_unlock(& mut self) {
+    fn flash_unlock(&mut self) {
         /* Authorize the FPEC of Bank1 Access */
-        self.peripheral.FLASH.keyr.write(|w| unsafe { w.key().bits(0x45670123) });
-        self.peripheral.FLASH.keyr.write(|w| unsafe { w.key().bits(0xCDEF89AB) });
+        self.peripheral
+            .FLASH
+            .keyr
+            .write(|w| unsafe { w.key().bits(0x45670123) });
+        self.peripheral
+            .FLASH
+            .keyr
+            .write(|w| unsafe { w.key().bits(0xCDEF89AB) });
     }
 
-    fn flash_lock(& mut self) {
+    fn flash_lock(&mut self) {
         /* Set the Lock Bit to lock the FPEC and the CR of  Bank1 */
         self.peripheral.FLASH.cr.modify(|_r, w| w.lock().set_bit());
     }
 
-    fn wait_till_not_busy(& mut self) -> u8 {
+    fn wait_till_not_busy(&mut self) -> u8 {
         let status: u8 = 0;
-        while self.peripheral.FLASH.sr.read().bsy().bit() {
-        }
+        while self.peripheral.FLASH.sr.read().bsy().bit() {}
         status
     }
-    
-    pub fn get_configuration(& mut self) {
+
+    pub fn get_configuration(&mut self) {
         // read a byte from flash
         let flash_word: u32 = CONFIG_FLASH_ADDRESS;
         let pflash_word = &flash_word as *const u32;
-       
+
         if unsafe { *pflash_word } == 0xFFFF_FFFF {
             // flash is uninitialized
             self.reset_to_factory();
@@ -93,7 +99,7 @@ impl Registers {
         }
     }
 
-    fn load_configuration_from_flash(& mut self, which: UseFlashStartAddress) {
+    fn load_configuration_from_flash(&mut self, which: UseFlashStartAddress) {
         let mut flash_addr: u32 = match which {
             UseFlashStartAddress::Factory => FACTORY_FLASH_ADDRESS,
             UseFlashStartAddress::Config => CONFIG_FLASH_ADDRESS,
@@ -107,7 +113,7 @@ impl Registers {
         }
     }
 
-    fn reset_to_factory(& mut self) {
+    fn reset_to_factory(&mut self) {
         // read a byte from flash
         let flash_word: u32 = FACTORY_FLASH_ADDRESS;
         let pflash_word = &flash_word as *const u32;
@@ -121,14 +127,14 @@ impl Registers {
         }
     }
 
-    pub fn clear_global_data(& mut self) {
+    pub fn clear_global_data(&mut self) {
         for i in 0..DATA_ARRAY_SIZE {
             let j: usize = (i + DATA_ARRAY_START).into();
             self.registers[j] = 0;
         }
     }
 
-    pub fn write_configuration_to_flash(& mut self, which: UseFlashStartAddress) {
+    pub fn write_configuration_to_flash(&mut self, which: UseFlashStartAddress) {
         let flash_addr: u32 = match which {
             UseFlashStartAddress::Factory => FACTORY_FLASH_ADDRESS,
             UseFlashStartAddress::Config => CONFIG_FLASH_ADDRESS,
@@ -144,12 +150,15 @@ impl Registers {
             let pg_flash_addr = flash_addr + offset;
             // enable the PER bit
             self.peripheral.FLASH.cr.modify(|_r, w| w.per().set_bit());
-            self.peripheral.FLASH.ar.write(|w| unsafe { w.bits(pg_flash_addr) });
+            self.peripheral
+                .FLASH
+                .ar
+                .write(|w| unsafe { w.bits(pg_flash_addr) });
             // enable the START bit
             self.peripheral.FLASH.cr.modify(|_r, w| w.strt().set_bit());
             self.wait_till_not_busy();
             // disable the PER bit
-            self.peripheral.FLASH.cr.modify(|_r,w| w.per().clear_bit());
+            self.peripheral.FLASH.cr.modify(|_r, w| w.per().clear_bit());
         }
         // write config data
         for i in 0..CONFIG_ARRAY_SIZE {
@@ -178,7 +187,7 @@ impl Registers {
 
             // check that flash matches register
             wd_flash_addr = flash_addr + offset;
-            let ptr = & wd_flash_addr as *const u32;
+            let ptr = &wd_flash_addr as *const u32;
             if self.get(j) != unsafe { *ptr } {
                 panic!("Written flash value doesn't match memory value");
             }

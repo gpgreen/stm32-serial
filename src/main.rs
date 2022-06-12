@@ -8,9 +8,10 @@ extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to c
                          // extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
 
 use cortex_m_rt::entry;
+//use embedded_hal::digital::v2::OutputPin;
 use nb::block;
-use nucleo_f103rb::hal::{prelude::*, stm32, timer::Timer};
-use nucleo_f103rb::serial::Serial;
+use stm32f1xx_hal::serial::{Config, Serial};
+use stm32f1xx_hal::{pac, prelude::*, timer::Timer};
 mod serial;
 use serial_packet_parser::PacketParser;
 mod register;
@@ -20,8 +21,9 @@ use register::Registers;
 fn main() -> ! {
     // Get access to the core peripherals from the cortex-m crate
     let cp = cortex_m::Peripherals::take().unwrap();
+
     // Get access to the device specific peripherals from the peripheral access crate
-    let dp = stm32::Peripherals::take().unwrap();
+    let dp = pac::Peripherals::take().unwrap();
 
     // Take ownership over the raw flash and rcc devices and convert them into the corresponding
     // HAL structs
@@ -37,10 +39,10 @@ fn main() -> ! {
     registers.get_configuration();
 
     // afio
-    let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
+    let mut afio = dp.AFIO.constrain();
 
     // gpioa
-    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    let mut gpioa = dp.GPIOA.split();
 
     // USART2 on Pins A2 and A3
     let pin_tx = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
@@ -50,9 +52,8 @@ fn main() -> ! {
         dp.USART2,
         (pin_tx, pin_rx),
         &mut afio.mapr,
-        115_200.bps(),
+        Config::default().baudrate(115_200.bps()),
         clocks,
-        &mut rcc.apb1,
     );
 
     // separate into tx and rx channels
@@ -65,8 +66,9 @@ fn main() -> ! {
     // in order to configure the port. For pins 0-7, crl should be passed instead.
     let mut led = gpioa.pa5.into_push_pull_output(&mut gpioa.crl);
 
-    // Configure the syst timer to trigger an update every second
-    let mut timer = Timer::syst(cp.SYST, 1.hz(), clocks);
+    // Configure syst timer to trigger an update every second
+    let mut timer = Timer::syst(cp.SYST, &clocks).counter_hz();
+    timer.start(1.Hz()).unwrap();
 
     // create serial types
     let mut parser = PacketParser::new();
